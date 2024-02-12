@@ -1,0 +1,58 @@
+name: [repository-name] - test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+
+env:
+  DOCKER_USER: ${{ secrets.DO_DOCKER_USER }}
+  DOCKER_PASSWORD: ${{ secrets.DO_DOCKER_PASSWORD }}
+  DOCKET_REGISTRY: ${{ secrets.DO_DOCKER_REGISTRY }}
+  REPO_NAME: "registry.digitalocean.com/piche"
+  IMAGE_NAME: "[repository-name]"
+  RUN_NUMBER: ${{ github.run_number }}
+  TOKEN: ${{ secrets.CSHARP_READ_NUGET_TOKEN }}
+  SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+  PROJECT_NAME: "[project-name]"
+  TAG: "develop"
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        name: Checkout Repository
+        uses: actions/checkout@v3
+      -
+        name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y%m%d')"
+      -
+        name: docker login
+        run: |
+          docker login $DOCKET_REGISTRY -u $DOCKER_USER -p $DOCKER_PASSWORD  
+      -
+        name: Build the Docker image
+        run: |
+          docker build . --file ./$PROJECT_NAME/DockerfileDevelop --build-arg="TOKEN=$TOKEN" --build-arg="SOURCE=$SOURCE" -t $REPO_NAME/$IMAGE_NAME:$TAG.${{ steps.date.outputs.date }}.$RUN_NUMBER -t $REPO_NAME/$IMAGE_NAME:$TAG
+      -
+        name: Docker Push
+        run: |
+          docker push $REPO_NAME/$IMAGE_NAME:$TAG
+          docker push $REPO_NAME/$IMAGE_NAME:$TAG.${{ steps.date.outputs.date }}.$RUN_NUMBER
+      -
+        name: Set ARM64 image name
+        run: echo "ARM_IMAGE_NAME=${{ env.IMAGE_NAME }}-arm64" >> $GITHUB_ENV
+      -
+        name: Build the Docker ARM64 image
+        run: |
+          docker build . --file ./$PROJECT_NAME/DockerfileDevelop --platform linux/arm64 --build-arg="TOKEN=$TOKEN" --build-arg="SOURCE=$SOURCE" -t $REPO_NAME/$ARM_IMAGE_NAME:$TAG.${{ steps.date.outputs.date }}.$RUN_NUMBER -t $REPO_NAME/$ARM_IMAGE_NAME:$TAG
+      -
+        name: Docker Push ARM64
+        run: |
+          docker push $REPO_NAME/$ARM_IMAGE_NAME:$TAG
+          docker push $REPO_NAME/$ARM_IMAGE_NAME:$TAG.${{ steps.date.outputs.date }}.$RUN_NUMBER
